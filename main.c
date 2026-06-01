@@ -4,15 +4,17 @@
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
+
 #include "raylib.h"
 #include "raymath.h"
+
 #define ZDX_SIMPLEX_3D_IMPLEMENTATION
 #include "./simplex3d.h"
 
-typedef uint8_t u8;
+typedef uint8_t  u8;
 typedef uint32_t u32;
-typedef float f32;
-typedef double f64;
+typedef float    f32;
+typedef double   f64;
 
 #define DeferScope(startExpr, endExpr) \
   for(int DeferScope_i__ = (startExpr, 0); DeferScope_i__ == 0; (DeferScope_i__++, endExpr))
@@ -20,20 +22,24 @@ typedef double f64;
 #define WIDTH 1280
 #define HEIGHT 720
 
-#define GRIDLEN 10
+#define GRIDLEN     10
 #define HALFGRIDLEN (GRIDLEN/2)
-#define COLS (WIDTH/GRIDLEN+1)
-#define ROWS (HEIGHT/GRIDLEN+1)
+#define COLS        (WIDTH/GRIDLEN+1)
+#define ROWS        (HEIGHT/GRIDLEN+1)
 
-
-#define POINTSCOUNT COLS*ROWS
-#define POINTRADIUS 5.f
-#define POINTFMT "(x, y, weight, addr) = (%6.1f, %6.1f, %1.1f, %p)"
+#define POINTSCOUNT     COLS*ROWS
+#define POINTRADIUS     5.f
+#define POINTFMT        "(x, y, weight, addr) = (%6.1f, %6.1f, %1.1f, %p)"
 #define POINTFMTARGS(p) (p).pos.x, (p).pos.y, (p).weight, ((void *)&(p))
 
-#define POINTCOLOR(weight) (Color){0xFF, 0x00, 0x00, 0xFF*(weight)}
-#define TEXTCOLOR(weight) (Color){0xff,0xff,0xff,0xff*(weight)}
-#define LINECOLOR(weight) (Color){0x00, 0x34, 0xaa, 0xff*(weight)}
+#define BGCOLOR            (Color){0,    0,    0,    0}
+#define POINTCOLOR(weight) (Color){0xFF, 0,    0,    0xFF*(weight)}
+#define TEXTCOLOR(weight)  (Color){0xFF, 0xFF, 0xFF, 0xFF*(weight)}
+#define LINECOLOR(weight)  (Color){0x00, 0x33, 0xAA, 0xFF*(weight)}
+
+// Simplex3D related
+#define DEFAULT_FEATURESIZE 0.006f
+#define DEFAULT_RATEOFCHANGE 0.1f
 
 typedef struct {
   Vector2 pos;
@@ -42,16 +48,8 @@ typedef struct {
 
 static Point points[POINTSCOUNT] = {0};
 
-f32 getRand(void)
+void updatePoints(f64 t, f32 featureSize, f32 rateOfChange)
 {
-  return (f32)rand()/(f32)RAND_MAX;
-}
-
-void updatePoints(f64 t)
-{
-  f32 featureSize  = .006f;
-  f32 rateOfChange = .1f;
-
   for (u32 y = 0; y < ROWS; y++) {
     for (u32 x = 0; x < COLS; x++) {
       points[x+(y*COLS)] = (Point){
@@ -98,12 +96,15 @@ u8 getState(const Point a, const Point b, const Point c, const Point d)
 
 int main(void)
 {
-  srand(1337);
-  updatePoints(1);
-
   char text[10] = {0};
   bool drawDebug = false;
   bool drawText = false;
+
+  // Simplex3D related controls
+  f32 featureSize  = DEFAULT_FEATURESIZE;
+  f32 rateOfChange = DEFAULT_RATEOFCHANGE;
+
+  updatePoints(1, featureSize, rateOfChange);
 
   InitWindow(WIDTH, HEIGHT, "Marching squares contouring simplex3d noise");
   SetTargetFPS(60);
@@ -121,12 +122,41 @@ int main(void)
       drawText = !drawText;
     }
 
+    if (IsKeyPressed(KEY_R)) {
+      featureSize = DEFAULT_FEATURESIZE;
+      rateOfChange = DEFAULT_RATEOFCHANGE;
+    }
+
+    if (IsKeyPressed(KEY_P) || IsKeyPressedRepeat(KEY_P)) {
+      featureSize += 0.001f;
+    }
+
+    if (IsKeyPressed(KEY_O) || IsKeyPressedRepeat(KEY_O)) {
+      featureSize -= 0.001f;
+
+      if (featureSize < 0) {
+        featureSize = DEFAULT_RATEOFCHANGE;
+      }
+    }
+
+    if (IsKeyPressed(KEY_L) || IsKeyPressedRepeat(KEY_L)) {
+      rateOfChange += 0.01f;
+    }
+
+    if (IsKeyPressed(KEY_K) || IsKeyPressedRepeat(KEY_K)) {
+      rateOfChange -= 0.01f;
+
+      if (rateOfChange < 0) {
+        rateOfChange = DEFAULT_RATEOFCHANGE;
+      }
+    }
+
     f64 t = GetTime();
 
-    updatePoints(t);
+    updatePoints(t, featureSize, rateOfChange);
 
     DeferScope(BeginDrawing(), EndDrawing()) {
-      ClearBackground(GetColor(0x181818FF));
+      ClearBackground(BGCOLOR);
 
       if (drawDebug) {
         for (u32 i = 0; i < POINTSCOUNT; i++) {
