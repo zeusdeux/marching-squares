@@ -40,6 +40,7 @@ typedef double   f64;
 // Simplex3D related
 #define DEFAULT_FEATURESIZE 0.006f
 #define DEFAULT_RATEOFCHANGE 0.1f
+#define DEFAULT_ISOVAL 0.f
 
 typedef struct {
   Vector2 pos;
@@ -60,24 +61,23 @@ void updatePoints(f64 t, f32 featureSize, f32 rateOfChange)
   }
 }
 
-#define ISOVALUE 0.5f
-u8 getState(const Point a, const Point b, const Point c, const Point d)
+u8 getState(f32 isoVal, const Point a, const Point b, const Point c, const Point d)
 {
   u8 state = 0;
 
-  if (a.weight > ISOVALUE) {
+  if (a.weight > isoVal) {
     state |= 1;
   }
 
-  if (b.weight > ISOVALUE) {
+  if (b.weight > isoVal) {
     state |= 2;
   }
 
-  if (c.weight > ISOVALUE) {
+  if (c.weight > isoVal) {
     state |= 4;
   }
 
-  if (d.weight > ISOVALUE) {
+  if (d.weight > isoVal) {
     state |= 8;
   }
 
@@ -99,7 +99,10 @@ int main(void)
   char text[10] = {0};
   bool drawDebug = false;
   bool drawText = false;
+  bool play = true;
 
+  // marching squares controls
+  f32 isoVal = DEFAULT_ISOVAL;
   // Simplex3D related controls
   f32 featureSize  = DEFAULT_FEATURESIZE;
   f32 rateOfChange = DEFAULT_RATEOFCHANGE;
@@ -114,6 +117,10 @@ int main(void)
       break;
     }
 
+    if (IsKeyPressed(KEY_SPACE)) {
+      play = !play;
+    }
+
     if (IsKeyPressed(KEY_D)) {
       drawDebug = !drawDebug;
     }
@@ -125,6 +132,7 @@ int main(void)
     if (IsKeyPressed(KEY_R)) {
       featureSize = DEFAULT_FEATURESIZE;
       rateOfChange = DEFAULT_RATEOFCHANGE;
+      isoVal = DEFAULT_ISOVAL;
     }
 
     if (IsKeyPressed(KEY_P) || IsKeyPressedRepeat(KEY_P)) {
@@ -151,9 +159,23 @@ int main(void)
       }
     }
 
-    f64 t = GetTime();
+    if (IsKeyPressed(KEY_M) || IsKeyPressedRepeat(KEY_M)) {
+      isoVal += 0.01f;
+    }
 
-    updatePoints(t, featureSize, rateOfChange);
+
+    if (IsKeyPressed(KEY_N) || IsKeyPressedRepeat(KEY_N)) {
+      isoVal -= 0.01f;
+
+      if (isoVal < -1) {
+        isoVal = -1;
+      }
+    }
+
+    if (play) {
+      f64 t = GetTime();
+      updatePoints(t, featureSize, rateOfChange);
+    }
 
     DeferScope(BeginDrawing(), EndDrawing()) {
       ClearBackground(BGCOLOR);
@@ -162,7 +184,7 @@ int main(void)
         for (u32 i = 0; i < POINTSCOUNT; i++) {
           Point p = points[i];
 
-          DrawCircleV(p.pos, POINTRADIUS, POINTCOLOR(p.weight));
+          DrawCircleV(p.pos, POINTRADIUS, POINTCOLOR((p.weight+1)/2));
         }
       }
 
@@ -190,19 +212,19 @@ int main(void)
           // Get lerp'd mid points of each line segment a->b, b->c, c->d, d->a
           // TODO(mudit): Calc only once as these midpoints do not change
           // per pair of points
-          f32 abT = (ISOVALUE - a.weight)/(b.weight - a.weight);
+          f32 abT = (isoVal - a.weight)/(b.weight - a.weight);
           Vector2 abMid = {Lerp(a.pos.x, b.pos.x, abT), a.pos.y};
 
-          f32 bcT = (ISOVALUE - b.weight)/(c.weight - b.weight);
+          f32 bcT = (isoVal - b.weight)/(c.weight - b.weight);
           Vector2 bcMid = {b.pos.x, Lerp(b.pos.y, c.pos.y, bcT)};
 
-          f32 cdT = (ISOVALUE - c.weight)/(d.weight - c.weight);
+          f32 cdT = (isoVal - c.weight)/(d.weight - c.weight);
           Vector2 cdMid = {Lerp(c.pos.x, d.pos.x, cdT), c.pos.y};
 
-          f32 daT = (ISOVALUE - d.weight)/(a.weight - d.weight);
+          f32 daT = (isoVal - d.weight)/(a.weight - d.weight);
           Vector2 daMid = {d.pos.x, Lerp(d.pos.y, a.pos.y, daT)};
 
-          u8 state = getState(a, b, c, d);
+          u8 state = getState(isoVal, a, b, c, d);
 
           switch(state) {
             case 0:  break;
