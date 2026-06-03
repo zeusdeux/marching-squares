@@ -19,277 +19,296 @@ typedef double   f64;
 #define DeferScope(startExpr, endExpr) \
   for(int DeferScope_i__ = (startExpr, 0); DeferScope_i__ == 0; (DeferScope_i__++, endExpr))
 
-#define WIDTH 1280
-#define HEIGHT 720
+#define WIDTH       1280
+#define HEIGHT      720
 
 #define GRIDLEN     10
 #define HALFGRIDLEN (GRIDLEN/2)
 #define COLS        (WIDTH/GRIDLEN+1)
 #define ROWS        (HEIGHT/GRIDLEN+1)
 
-#define POINTSCOUNT     COLS*ROWS
-#define POINTRADIUS     5.f
-#define POINTFMT        "(x, y, weight, addr) = (%6.1f, %6.1f, %1.1f, %p)"
-#define POINTFMTARGS(p) (p).pos.x, (p).pos.y, (p).weight, ((void *)&(p))
+#define POINTSCOUNT COLS*ROWS
+#define POINTRADIUS 6.f
+
+// Marching squares controls
+#define DEFAULT_ISOVAL       -0.5f
+// Simplex3D related
+#define DEFAULT_FEATURESIZE  0.003f
+#define DEFAULT_RATEOFCHANGE 0.17f
 
 #define BGCOLOR            (Color){0,    0,    0,    0}
-#define POINTCOLOR(weight) (Color){0xFF, 0,    0,    0xFF*(weight)}
 #define TEXTCOLOR(weight)  (Color){0xFF, 0xFF, 0xFF, 0xFF*(weight)}
 #define LINECOLOR(weight)  (Color){0x00, 0x33, 0xAA, 0xFF*(weight)}
+#define INV(n)             (1.f-(n))
+#define QB(n)              ((n)*(n)*(n))
+#define POINTCOLOR(weight) (Color){0xFF*(weight), 0xFF*QB(weight), 0xFF*(weight)*INV(weight)*2, 0xFF}
 
-// Simplex3D related
-#define DEFAULT_FEATURESIZE 0.006f
-#define DEFAULT_RATEOFCHANGE 0.1f
-#define DEFAULT_ISOVAL 0.f
+typedef Vector2 Point;
 
-typedef struct {
-  Vector2 pos;
-  f32 weight;
-} Point;
+static Point points[POINTSCOUNT]  = {0};
+static f32   weights[POINTSCOUNT] = {0};
+static u8    states[POINTSCOUNT]  = {0};
 
-static Point points[POINTSCOUNT] = {0};
-
-void updatePoints(f64 t, f32 featureSize, f32 rateOfChange)
+void updatePoints(f32 isoVal, f64 t, f32 featureSize, f32 rateOfChange)
 {
   for (u32 y = 0; y < ROWS; y++) {
     for (u32 x = 0; x < COLS; x++) {
-      points[x+(y*COLS)] = (Point){
-        (Vector2){x*GRIDLEN*1.f, y*GRIDLEN*1.f},
-        simplex3d(x*GRIDLEN*featureSize, y*GRIDLEN*featureSize, t*rateOfChange),
-      };
+      u32 idx = x+(y*COLS);
+      f32 weight = simplex3d(x*GRIDLEN*featureSize, y*GRIDLEN*featureSize, t*rateOfChange);
+
+      points[idx] = (Point){x*GRIDLEN, y*GRIDLEN*1.f};
+      weights[idx] = weight;
+      states[idx] = (u8)(weight < isoVal);
     }
   }
 }
 
-u8 getState(f32 isoVal, const Point a, const Point b, const Point c, const Point d)
-{
-  u8 state = 0;
-
-  if (a.weight > isoVal) {
-    state |= 1;
-  }
-
-  if (b.weight > isoVal) {
-    state |= 2;
-  }
-
-  if (c.weight > isoVal) {
-    state |= 4;
-  }
-
-  if (d.weight > isoVal) {
-    state |= 8;
-  }
-
-  #if 0
-  printf("POINT: CLOCKWISE FROM LEFT CORNER");
-  printf("\n\ta: "POINTFMT, POINTFMTARGS(a));
-  printf("\n\tb: "POINTFMT, POINTFMTARGS(b));
-  printf("\n\tc: "POINTFMT, POINTFMTARGS(c));
-  printf("\n\td: "POINTFMT"\n", POINTFMTARGS(d));
-  printf("\tSTATE: %u\n", state);
-  #endif
-
-  return state;
-}
-
-
 int main(void)
 {
-  char text[10] = {0};
-  bool drawDebug = false;
-  bool drawText = false;
-  bool play = true;
+  char text[15] = {0};
 
-  // marching squares controls
+  bool drawFps      = false;
+  bool drawPoints   = false;
+  bool drawText     = false;
+  bool drawContours = true;
+  bool play         = true;
+
+  // Marching squares controls
   f32 isoVal = DEFAULT_ISOVAL;
   // Simplex3D related controls
   f32 featureSize  = DEFAULT_FEATURESIZE;
   f32 rateOfChange = DEFAULT_RATEOFCHANGE;
 
-  updatePoints(1, featureSize, rateOfChange);
+  updatePoints(isoVal, 1, featureSize, rateOfChange);
 
-  InitWindow(WIDTH, HEIGHT, "Marching squares contouring simplex3d noise");
+  InitWindow(WIDTH, HEIGHT, "Marching squares contouring Simplex3D noise");
   SetTargetFPS(60);
 
   while(!WindowShouldClose()) {
-    if (IsKeyPressed(KEY_Q)) {
-      break;
-    }
-
-    if (IsKeyPressed(KEY_SPACE)) {
-      play = !play;
-    }
-
-    if (IsKeyPressed(KEY_D)) {
-      drawDebug = !drawDebug;
-    }
-
-    if (IsKeyPressed(KEY_T)) {
-      drawText = !drawText;
-    }
-
-    if (IsKeyPressed(KEY_R)) {
-      featureSize = DEFAULT_FEATURESIZE;
-      rateOfChange = DEFAULT_RATEOFCHANGE;
-      isoVal = DEFAULT_ISOVAL;
-    }
-
-    if (IsKeyPressed(KEY_P) || IsKeyPressedRepeat(KEY_P)) {
-      featureSize += 0.001f;
-    }
-
-    if (IsKeyPressed(KEY_O) || IsKeyPressedRepeat(KEY_O)) {
-      featureSize -= 0.001f;
-
-      if (featureSize < 0) {
-        featureSize = DEFAULT_RATEOFCHANGE;
+    // Handle input
+    {
+      if (IsKeyPressed(KEY_Q)) {
+        break;
       }
-    }
 
-    if (IsKeyPressed(KEY_L) || IsKeyPressedRepeat(KEY_L)) {
-      rateOfChange += 0.01f;
-    }
+      if (IsKeyPressed(KEY_SPACE)) {
+        play = !play;
+      }
 
-    if (IsKeyPressed(KEY_K) || IsKeyPressedRepeat(KEY_K)) {
-      rateOfChange -= 0.01f;
+      if (IsKeyPressed(KEY_F)) {
+        drawFps = !drawFps;
+      }
 
-      if (rateOfChange < 0) {
+      if (IsKeyPressed(KEY_D)) {
+        drawPoints = !drawPoints;
+      }
+
+      if (IsKeyPressed(KEY_T)) {
+        drawText = !drawText;
+      }
+
+      // reset
+      if (IsKeyPressed(KEY_R)) {
+        featureSize  = DEFAULT_FEATURESIZE;
         rateOfChange = DEFAULT_RATEOFCHANGE;
+        isoVal       = DEFAULT_ISOVAL;
+      }
+
+      // feature size
+      if (IsKeyPressed(KEY_P) || IsKeyPressedRepeat(KEY_P)) {
+        featureSize += 0.0001f;
+      }
+
+      if (IsKeyPressed(KEY_O) || IsKeyPressedRepeat(KEY_O)) {
+        featureSize -= 0.0001f;
+
+        if (featureSize < 0.f) {
+          featureSize = 0;
+        }
+      }
+
+      // rate of change
+      if (IsKeyPressed(KEY_L) || IsKeyPressedRepeat(KEY_L)) {
+        rateOfChange += 0.005f;
+      }
+
+      if (IsKeyPressed(KEY_K) || IsKeyPressedRepeat(KEY_K)) {
+        rateOfChange -= 0.005f;
+
+        if (rateOfChange < 0) {
+          rateOfChange = 0;
+        }
+      }
+
+      // iso val
+      if (IsKeyPressed(KEY_M) || IsKeyPressedRepeat(KEY_M)) {
+        isoVal += 0.01f;
+
+        if (isoVal > 1.f) {
+          isoVal = 1.f;
+        }
+      }
+
+      if (IsKeyPressed(KEY_N) || IsKeyPressedRepeat(KEY_N)) {
+        isoVal -= 0.01f;
+
+        if (isoVal < -1.f) {
+          isoVal = -1.f;
+        }
+      }
+
+      if (IsKeyPressed(KEY_C)) {
+        drawContours = !drawContours;
       }
     }
 
-    if (IsKeyPressed(KEY_M) || IsKeyPressedRepeat(KEY_M)) {
-      isoVal += 0.01f;
-    }
-
-
-    if (IsKeyPressed(KEY_N) || IsKeyPressedRepeat(KEY_N)) {
-      isoVal -= 0.01f;
-
-      if (isoVal < -1) {
-        isoVal = -1;
-      }
-    }
-
+    // Update state
     if (play) {
       f64 t = GetTime();
-      updatePoints(t, featureSize, rateOfChange);
+      updatePoints(isoVal, t, featureSize, rateOfChange);
     }
 
-    DeferScope(BeginDrawing(), EndDrawing()) {
-      ClearBackground(BGCOLOR);
+    // Draw
+    {
+      DeferScope(BeginDrawing(), EndDrawing()) {
+        ClearBackground(BGCOLOR);
 
-      if (drawDebug) {
-        for (u32 i = 0; i < POINTSCOUNT; i++) {
-          Point p = points[i];
+        if (drawPoints) {
+          for (u32 i = 0; i < POINTSCOUNT; i++) {
+            Point p = points[i];
+            f32 weight = (weights[i]+1)/2.f;
 
-          DrawCircleV(p.pos, POINTRADIUS, POINTCOLOR((p.weight+1)/2));
-        }
-      }
-
-      if (drawText) {
-        for (u32 i = 0; i < POINTSCOUNT; i++) {
-          Point p = points[i];
-          int spErr = snprintf(text, 6, "%1.2f", p.weight);
-
-          if (spErr < 0) {
-            fprintf(stderr, "ERROR: Failed to write point weight to string - %s", strerror(errno));
-            return 1;
+            // TODO(mudit): Speed this up as it is mad slow
+            DrawCircleV(p, POINTRADIUS, POINTCOLOR(weight));
           }
-
-          DrawText(text, p.pos.x, p.pos.y, 14, TEXTCOLOR(p.weight));
         }
-      }
 
-      for (u32 y = 0; y < ROWS-1; y++) {
-        for (u32 x = 0; x < COLS-1; x++) {
-          Point a = points[x+(y*COLS)];       // [x][y]
-          Point b = points[x+1+(y*COLS)];     // [x+1][y]
-          Point c = points[x+1+((y+1)*COLS)]; // [x+1][y+1]
-          Point d = points[x+((y+1)*COLS)];   // [x][y+1]
+        if (drawText) {
+          for (u32 i = 0; i < POINTSCOUNT; i++) {
+            Point p = points[i];
+            f32 weight = (weights[i]+1)/2.f;
+            int spErr = snprintf(text, 8, "%3.2f", weight);
 
-          // Get lerp'd mid points of each line segment a->b, b->c, c->d, d->a
-          // TODO(mudit): Calc only once as these midpoints do not change
-          // per pair of points
-          f32 abT = (isoVal - a.weight)/(b.weight - a.weight);
-          Vector2 abMid = {Lerp(a.pos.x, b.pos.x, abT), a.pos.y};
-
-          f32 bcT = (isoVal - b.weight)/(c.weight - b.weight);
-          Vector2 bcMid = {b.pos.x, Lerp(b.pos.y, c.pos.y, bcT)};
-
-          f32 cdT = (isoVal - c.weight)/(d.weight - c.weight);
-          Vector2 cdMid = {Lerp(c.pos.x, d.pos.x, cdT), c.pos.y};
-
-          f32 daT = (isoVal - d.weight)/(a.weight - d.weight);
-          Vector2 daMid = {d.pos.x, Lerp(d.pos.y, a.pos.y, daT)};
-
-          u8 state = getState(isoVal, a, b, c, d);
-
-          switch(state) {
-            case 0:  break;
-            case 15: break;
-
-            case 1: {
-              DrawLineV(abMid, daMid, LINECOLOR(1.f));
-            } break;
-
-            case 2: {
-              DrawLineV(abMid, bcMid, LINECOLOR(1.f));
-            } break;
-
-            case 3: {
-              DrawLineV(daMid, bcMid, LINECOLOR(1.f));
-            } break;
-
-            case 4: {
-              DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
-            } break;
-
-            case 5: {
-              DrawLineV(abMid, daMid, LINECOLOR(1.f));
-              DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
-            } break;
-
-            case 6: {
-              DrawLineV(abMid, cdMid, LINECOLOR(1.f));
-            } break;
-
-            case 7:
-            case 8: {
-              DrawLineV(cdMid, daMid, LINECOLOR(1.f));
-            } break;
-
-            case 9: {
-              DrawLineV(abMid, cdMid, LINECOLOR(1.f));
-            } break;
-
-            case 10: {
-              DrawLineV(daMid, cdMid, LINECOLOR(1.f));
-              DrawLineV(abMid, bcMid, LINECOLOR(1.f));
-            } break;
-
-            case 11: {
-              DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
-            } break;
-
-            case 12: {
-              DrawLineV(daMid, bcMid, LINECOLOR(1.f));
-            } break;
-
-            case 13: {
-              DrawLineV(abMid, bcMid, LINECOLOR(1.f));
-            } break;
-
-            case 14: {
-              DrawLineV(daMid, abMid, LINECOLOR(1.f));
-            } break;
-
-            default: {
-              printf("Error: INVALID STATE %u\n", state);
+            if (spErr < 0) {
+              fprintf(stderr, "ERROR: Failed to write point weight to string - %s",
+                      strerror(errno));
               return 1;
-            } break;
+            }
+
+            DrawText(text, p.x, p.y, 14, TEXTCOLOR(weight));
           }
+        }
+
+        if (drawContours) {
+          for (u32 y = 0; y < ROWS-1; y++) {
+
+            // TODO(mudit): a and d can be calc out here and then in
+            // the loop we calc and use b and c and at end of inner
+            // loop a = b, c = d
+            for (u32 x = 0; x < COLS-1; x++) {
+              int aIdx = x+(y*COLS);       // [x][y]
+              int bIdx = x+1+(y*COLS);     // [x+1][y]
+              int cIdx = x+1+((y+1)*COLS); // [x+1][y+1]
+              int dIdx = x+((y+1)*COLS);   // [x][y+1]
+
+              Point a = points[aIdx];
+              Point b = points[bIdx];
+              Point c = points[cIdx];
+              Point d = points[dIdx];
+
+              f32 aWt = weights[aIdx];
+              f32 bWt = weights[bIdx];
+              f32 cWt = weights[cIdx];
+              f32 dWt = weights[dIdx];
+
+              f32 abT     = (isoVal - aWt)/(bWt - aWt);
+              Point abMid = {Lerp(a.x, b.x, abT), a.y};
+              f32 bcT     = (isoVal - bWt)/(cWt - bWt);
+              Point bcMid = {b.x, Lerp(b.y, c.y, bcT)};
+              f32 cdT     = (isoVal - cWt)/(dWt - cWt);
+              Point cdMid = {Lerp(c.x, d.x, cdT), c.y};
+              f32 daT     = (isoVal - dWt)/(aWt - dWt);
+              Point daMid = {d.x, Lerp(d.y, a.y, daT)};
+
+              u8 aSt = states[aIdx];
+              u8 bSt = states[bIdx];
+              u8 cSt = states[cIdx];
+              u8 dSt = states[dIdx];
+
+              u8 state = aSt | bSt << 1 | cSt << 2 | dSt << 3;
+
+              // this has duplications but I don't care for now
+              switch(state) {
+                case 0:  break;
+                case 15: break;
+
+                case 1: {
+                  DrawLineV(abMid, daMid, LINECOLOR(1.f));
+                } break;
+
+                case 2: {
+                  DrawLineV(abMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 3: {
+                  DrawLineV(daMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 4: {
+                  DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 5: {
+                  DrawLineV(abMid, daMid, LINECOLOR(1.f));
+                  DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 6: {
+                  DrawLineV(abMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 7:
+                case 8: {
+                  DrawLineV(cdMid, daMid, LINECOLOR(1.f));
+                } break;
+
+                case 9: {
+                  DrawLineV(abMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 10: {
+                  DrawLineV(daMid, cdMid, LINECOLOR(1.f));
+                  DrawLineV(abMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 11: {
+                  DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 12: {
+                  DrawLineV(daMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 13: {
+                  DrawLineV(abMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 14: {
+                  DrawLineV(daMid, abMid, LINECOLOR(1.f));
+                } break;
+
+                default: {
+                  fprintf(stderr, "Error: INVALID STATE %u\n", state);
+                  return 1;
+                } break;
+              }
+            }
+          }
+        }
+
+        // Draw FPS on top of everything
+        if (drawFps) {
+          DrawFPS(20, 20);
         }
       }
     }
