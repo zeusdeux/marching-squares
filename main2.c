@@ -68,10 +68,11 @@ int main(void)
     }
   }
 
-  // NOTES(mudit): This is a fun one!
+  // This is a fun one!
   // SetConfigFlags(FLAG_WINDOW_TRANSPARENT);
+  // this will cause a panic at resolutions higher than 1280x720
+  // SetConfigFlags(FLAG_WINDOW_UNDECORATED);
   SetConfigFlags(FLAG_WINDOW_HIGHDPI);
-  SetConfigFlags(FLAG_WINDOW_UNDECORATED);
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(WIDTH, HEIGHT, "Custom shaders example");
   SetTargetFPS(120);
