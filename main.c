@@ -56,7 +56,7 @@ void updatePoints(f32 isoVal, f64 t, f32 featureSize, f32 rateOfChange)
       u32 idx = x+(y*COLS);
       f32 weight = simplex3d(x*GRIDLEN*featureSize, y*GRIDLEN*featureSize, t*rateOfChange);
 
-      points[idx] = (Point){x*GRIDLEN, y*GRIDLEN*1.f};
+      points[idx] = (Point){x*GRIDLEN*1.f, y*GRIDLEN*1.f};
       weights[idx] = weight;
       states[idx] = (u8)(weight < isoVal);
     }
