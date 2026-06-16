@@ -51,7 +51,7 @@ void updateWeights(f64 t, f32 featureSize, f32 rateOfChange)
 
 int main(void)
 {
-  char pointCountText[128] = {0};
+  char pointCountText[64] = {0};
   snprintf(pointCountText, 64, "%d points", POINTSCOUNT);
 
   f64 t = 0;
