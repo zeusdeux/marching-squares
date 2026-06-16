@@ -23,7 +23,8 @@
 #define ROWS ((HEIGHT/GRID_W)+1)
 #define POINTSCOUNT (COLS*ROWS)
 
-#define BGCOLOR (Color){0}
+#define BGCOLOR           (Color){0}
+#define LINECOLOR(weight) (Color){0x88, 0x33, 0xAA, 0xFF*(weight)}
 
 typedef uint8_t  u8;
 typedef uint32_t u32;
@@ -34,8 +35,10 @@ typedef Vector2  Point;
 
 static Point points[POINTSCOUNT]  = {0};
 static f32   weights[POINTSCOUNT] = {0};
+static u8    states[POINTSCOUNT]  = {0};
 static f32   featureSize          = 0.003f;
 static f32   rateOfChange         = 0.17f;
+static f32   isoVal               = -0.5f;
 
 void updateWeights(f32 t)
 {
@@ -49,9 +52,10 @@ void updateWeights(f32 t)
     for (u32 x = 0; x < COLS; x++) {
       f32 X = x*sizeFactor;
       f32 weight = simplex3d(X, Y, Z);
-      // NOTES(mudit): shift sampled weight from -1..1 to 0..1 as it's
-      // used to calculate fragment color in the vertex shader
-      weights[x+yIdx] = (weight+1.f)*0.5f;
+
+      u32 idx = x+yIdx;
+      weights[idx] = weight;
+      states[idx]  = (u8)(weight < isoVal);
     }
   }
 }
@@ -61,13 +65,16 @@ int main(void)
   char pointCountText[64] = {0};
   snprintf(pointCountText, 64, "%d points", POINTSCOUNT);
 
-  f64 t = 0;
-  bool drawFps = false;
+  f64 t             = 0;
+  bool drawFps      = false;
+  bool drawPoints   = true;
+  bool drawContours = false;
+  bool play         = true;
 
   for (u32 y = 0; y < ROWS; y++) {
     for (u32 x = 0; x < COLS; x++) {
       u32 idx = x+(y*COLS);
-      points[idx] = (Point){x*GRID_W, y*GRID_W*1.f};
+      points[idx] = (Point){x*GRID_W*1.f, y*GRID_W*1.f};
     }
   }
 
@@ -77,7 +84,7 @@ int main(void)
   // SetConfigFlags(FLAG_WINDOW_UNDECORATED);
   SetConfigFlags(FLAG_WINDOW_HIGHDPI);
   SetConfigFlags(FLAG_MSAA_4X_HINT);
-  InitWindow(WIDTH, HEIGHT, "Custom shaders example");
+  InitWindow(WIDTH, HEIGHT, "Marching squares contouring Simplex3D noise rendered using GL_POINTS");
   SetTargetFPS(120);
 
   Shader pointShader = LoadShader("point.vert", "point.frag");
@@ -152,30 +159,199 @@ int main(void)
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+  SetExitKey(KEY_Q);
+
   while(!WindowShouldClose()) {
+    // animation control
+    bool rightControl = IsKeyDown(KEY_RIGHT_CONTROL);
+    bool keyC = IsKeyPressed(KEY_C);
+
+    if (!rightControl && keyC) {
+      drawContours = !drawContours;
+    }
+
+    if (rightControl && keyC) {
+      drawPoints = !drawPoints;
+    }
+
+    bool keyS = IsKeyPressed(KEY_S) || IsKeyPressedRepeat(KEY_S);
+
+    if (!rightControl && keyS) {
+      featureSize += 0.0001f;
+    }
+
+    if (rightControl && keyS) {
+      featureSize -= 0.0001f;
+
+      if (featureSize < 0.f) {
+        featureSize = 0;
+      }
+    }
+
+    bool keyT = IsKeyPressed(KEY_T) || IsKeyPressedRepeat(KEY_T);
+
+    if (!rightControl && keyT) {
+      rateOfChange += 0.01f;
+    }
+
+    if (rightControl && keyT) {
+      rateOfChange -= 0.01f;
+
+      if (rateOfChange < 0) {
+        rateOfChange = 0;
+      }
+    }
+
+    bool keyI = IsKeyPressed(KEY_I) || IsKeyPressedRepeat(KEY_I);
+
+    if (!rightControl && keyI) {
+      isoVal += 0.01f;
+
+      if (isoVal > 1.f) {
+        isoVal = 1.f;
+      }
+    }
+
+    if (rightControl && keyI) {
+      isoVal -= 0.01f;
+
+      if (isoVal < -1.f) {
+        isoVal = -1.f;
+      }
+    }
+
+    if (rightControl && IsKeyPressed(KEY_G)) {
+      featureSize  = 0.003f;
+      rateOfChange = 0.17f;
+      isoVal       = -0.5f;
+    }
+
+
+    // perf/debug
     if (IsKeyPressed(KEY_F)) {
       drawFps = !drawFps;
     }
 
-    t = (f32)GetTime();
-    updateWeights(t);
 
+    // play/pause
+    if (IsKeyPressed(KEY_SPACE)) {
+      play = !play;
+    }
+
+    if (play) {
+      t = (f32)GetTime();
+      updateWeights(t);
+    }
+
+    // draw
     DeferScope(BeginDrawing(), EndDrawing()) {
       ClearBackground(BGCOLOR);
       // NOTES(mudit): Force raylib to flush its internal batch
       rlDrawRenderBatchActive();
 
-      // NOTES(mudit): Bind the vbo we want to update and update it
-      // using glBufferSubData. We don't need to unbind it as we
-      // unbind the VAO altogether
-      glBindBuffer(GL_ARRAY_BUFFER, weightsVbo);
-      glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(weights), weights);
+      if (drawPoints) {
+        // NOTES(mudit): Bind the vbo we want to update and update it
+        // using glBufferSubData. We don't need to unbind it as we
+        // unbind the VAO altogether
+        glBindBuffer(GL_ARRAY_BUFFER, weightsVbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(weights), weights);
 
-      DeferScope(glUseProgram(pointShader.id), glUseProgram(0)) {
-        glBindVertexArray(vao);
-        glDrawArrays(GL_POINTS, 0, POINTSCOUNT);
-        glBindVertexArray(0);
+        DeferScope(glUseProgram(pointShader.id), glUseProgram(0)) {
+          glBindVertexArray(vao);
+          glDrawArrays(GL_POINTS, 0, POINTSCOUNT);
+          glBindVertexArray(0);
+        }
       }
+
+      if (drawContours) {
+          for (u32 y = 0; y < ROWS-1; y++) {
+            // TODO(mudit): a and d can be calc out here and then in
+            // the loop we calc and use b and c and at end of inner
+            // loop a = b, c = d
+            for (u32 x = 0; x < COLS-1; x++) {
+              int aIdx = x+(y*COLS);       // [x][y]
+              int bIdx = x+1+(y*COLS);     // [x+1][y]
+              int cIdx = x+1+((y+1)*COLS); // [x+1][y+1]
+              int dIdx = x+((y+1)*COLS);   // [x][y+1]
+
+              Point a = points[aIdx];
+              Point b = points[bIdx];
+              Point c = points[cIdx];
+              Point d = points[dIdx];
+
+              f32 aWt = weights[aIdx];
+              f32 bWt = weights[bIdx];
+              f32 cWt = weights[cIdx];
+              f32 dWt = weights[dIdx];
+
+              f32 abT     = (isoVal - aWt)/(bWt - aWt);
+              Point abMid = {Lerp(a.x, b.x, abT), a.y};
+              f32 bcT     = (isoVal - bWt)/(cWt - bWt);
+              Point bcMid = {b.x, Lerp(b.y, c.y, bcT)};
+              f32 cdT     = (isoVal - cWt)/(dWt - cWt);
+              Point cdMid = {Lerp(c.x, d.x, cdT), c.y};
+              f32 daT     = (isoVal - dWt)/(aWt - dWt);
+              Point daMid = {d.x, Lerp(d.y, a.y, daT)};
+
+              u8 aSt = states[aIdx];
+              u8 bSt = states[bIdx];
+              u8 cSt = states[cIdx];
+              u8 dSt = states[dIdx];
+
+              u8 state = aSt | bSt << 1 | cSt << 2 | dSt << 3;
+
+              switch(state) {
+                case 0:
+                case 15: break;
+
+                case 1:
+                case 14: {
+                  DrawLineV(abMid, daMid, LINECOLOR(1.f));
+                } break;
+
+                case 2:
+                case 13: {
+                  DrawLineV(abMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 3:
+                case 12: {
+                  DrawLineV(daMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                case 4:
+                case 11: {
+                  DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 5: {
+                  DrawLineV(abMid, daMid, LINECOLOR(1.f));
+                  DrawLineV(bcMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 6:
+                case 9: {
+                  DrawLineV(abMid, cdMid, LINECOLOR(1.f));
+                } break;
+
+                case 7:
+                case 8: {
+                  DrawLineV(cdMid, daMid, LINECOLOR(1.f));
+                } break;
+
+                case 10: {
+                  DrawLineV(daMid, cdMid, LINECOLOR(1.f));
+                  DrawLineV(abMid, bcMid, LINECOLOR(1.f));
+                } break;
+
+                default: {
+                  fprintf(stderr, "Error: INVALID STATE %u\n", state);
+                  return 1;
+                } break;
+              }
+            }
+          }
+        }
 
       if (drawFps) {
         DrawFPS(20, 20);

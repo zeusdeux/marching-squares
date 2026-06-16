@@ -81,7 +81,7 @@ int main(void)
 
   updatePoints(isoVal, 1, featureSize, rateOfChange);
 
-  InitWindow(WIDTH, HEIGHT, "Marching squares contouring Simplex3D noise");
+  InitWindow(WIDTH, HEIGHT, "Marching squares contouring Simplex3D noise rendered using DrawCircleV");
   SetTargetFPS(60);
 
   while(!WindowShouldClose()) {

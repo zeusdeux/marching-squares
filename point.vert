@@ -32,8 +32,11 @@ void main()
   // past 60 doesn't make any difference
   gl_PointSize = 8.0;
 
-  fragColor = vec4(vertexWeight,
-                   vertexWeight*vertexWeight*vertexWeight,
-                   vertexWeight*(1-vertexWeight)*2,
+  // NOTES(mudit): shift sampled simplex4d weight from -1..1 to 0..1
+  float wtuv = (vertexWeight+1.0)*0.5;
+
+  fragColor = vec4(wtuv,
+                   wtuv*wtuv*wtuv,
+                   wtuv*(1-wtuv)*2,
                    1.0);
 }
