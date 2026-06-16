@@ -10,6 +10,12 @@ run: main
 main: main.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(LIBS) $(FRAMEWORKS) $^ -o $@
 
+run2: main2
+	./$<
+
+main2: main2.c
+	$(CC) $(CFLAGS) $(INCLUDES) $(LIBS) $(FRAMEWORKS) $^ -o $@
+
 tags:
 	find -E `pwd` -type f -regex ".+\.(c|h)$$" > cscope.files
 	cscope -b -q
@@ -17,4 +23,4 @@ tags:
 clean:
 	rm -fr *.dSYM main cscope.*
 
-.PHONY: run tags clean
+.PHONY: run run2 tags clean
