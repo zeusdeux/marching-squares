@@ -21,6 +21,6 @@ tags:
 	cscope -b -q
 
 clean:
-	rm -fr *.dSYM main cscope.*
+	rm -fr *.dSYM main main2 cscope.*
 
 .PHONY: run run2 tags clean
