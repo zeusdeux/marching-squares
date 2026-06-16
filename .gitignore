@@ -9,4 +9,4 @@
 !*.frag
 !vendor/
 !vendor/**
-!*.gif
+!example.gif

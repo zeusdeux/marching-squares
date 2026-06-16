@@ -1,4 +1,4 @@
-# Naive marching squares
+# Marching squares
 
 Playing around with a basic contouring algorithm by attempting to
 contour simplex3D noise.
@@ -12,7 +12,7 @@ A gif should load below:
 On macos:
 
 ```sh
-make run
+make run2
 ```
 
 > This has only been built and run on macos. I haven't tested on
