@@ -157,9 +157,12 @@ int main(void)
 
     DeferScope(BeginDrawing(), EndDrawing()) {
       ClearBackground(BGCOLOR);
-      // NOTES(mudit): Force raylib to flush it's internal batch
+      // NOTES(mudit): Force raylib to flush its internal batch
       rlDrawRenderBatchActive();
 
+      // NOTES(mudit): Bind the vbo we want to update and update it
+      // using glBufferSubData. We don't need to unbind it as we
+      // unbind the VAO altogether
       glBindBuffer(GL_ARRAY_BUFFER, weightsVbo);
       glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(weights), weights);
 
