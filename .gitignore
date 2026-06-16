@@ -5,6 +5,8 @@
 !*.md
 !*.c
 !*.h
+!*.vert
+!*.frag
 !vendor/
 !vendor/**
 !*.gif
