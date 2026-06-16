@@ -32,19 +32,26 @@ typedef float    f32;
 typedef double   f64;
 typedef Vector2  Point;
 
-static Point points[POINTSCOUNT] = {0};
-static f32 weights[POINTSCOUNT]  = {0};
+static Point points[POINTSCOUNT]  = {0};
+static f32   weights[POINTSCOUNT] = {0};
+static f32   featureSize          = 0.003f;
+static f32   rateOfChange         = 0.17f;
 
-
-void updateWeights(f64 t, f32 featureSize, f32 rateOfChange)
+void updateWeights(f32 t)
 {
+  f32 Z = t*rateOfChange;
+  f32 sizeFactor = GRID_W*featureSize;
+
   for (u32 y = 0; y < ROWS; y++) {
+    f32 Y = y*sizeFactor;
+    u32 yIdx = (y*COLS);
+
     for (u32 x = 0; x < COLS; x++) {
-      u32 idx = x+(y*COLS);
-      f32 weight = simplex3d(x*GRID_W*featureSize, y*GRID_W*featureSize, t*rateOfChange);
+      f32 X = x*sizeFactor;
+      f32 weight = simplex3d(X, Y, Z);
       // NOTES(mudit): shift sampled weight from -1..1 to 0..1 as it's
       // used to calculate fragment color in the vertex shader
-      weights[idx] = (weight+1.f)/2.f;
+      weights[x+yIdx] = (weight+1.f)*0.5f;
     }
   }
 }
@@ -55,8 +62,6 @@ int main(void)
   snprintf(pointCountText, 64, "%d points", POINTSCOUNT);
 
   f64 t = 0;
-  f32 featureSize = 0.003f;
-  f32 rateOfChange = 0.17f;
   bool drawFps = false;
 
   for (u32 y = 0; y < ROWS; y++) {
@@ -152,8 +157,8 @@ int main(void)
       drawFps = !drawFps;
     }
 
-    t = GetTime();
-    updateWeights(t, featureSize, rateOfChange);
+    t = (f32)GetTime();
+    updateWeights(t);
 
     DeferScope(BeginDrawing(), EndDrawing()) {
       ClearBackground(BGCOLOR);

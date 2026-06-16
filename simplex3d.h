@@ -1,7 +1,7 @@
 #ifndef ZDX_SIMPLEX_3D_H_
 #define ZDX_SIMPLEX_3D_H_
 
-float simplex3d(float x, float y, double z);
+float simplex3d(float x, float y, float z);
 
 #endif // ZDX_SIMPLEX_3D_H_
 
@@ -35,7 +35,7 @@ static const int grad3[12][3] = {
     { 0, 1, 1}, { 0,-1, 1}, { 0, 1,-1}, { 0,-1,-1}
 };
 
-float simplex3d(float x, float y, double z)
+float simplex3d(float x, float y, float z)
 {
     const float F3 = 1.0f / 3.0f;
     const float G3 = 1.0f / 6.0f;
