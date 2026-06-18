@@ -488,7 +488,6 @@ int main(void)
         if (play) {
           t = (f32)GetTime();
           updateState(t, drawContours);
-
         }
       }
 
