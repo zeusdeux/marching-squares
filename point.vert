@@ -17,6 +17,7 @@ in vec2 vertexPosition;
 // These are custom
 in float vertexWeight;
 uniform vec2 resolution;
+uniform float pointSize;
 
 // Output vertex attributes (to fragment shader)
 out vec4 fragColor;
@@ -31,7 +32,7 @@ void main()
   gl_Position = vec4(ndc, 0.0, 1.0);
   // NOTES(mudit): macos seems to have a hard limit on this so going
   // past 60 doesn't make any difference
-  gl_PointSize = 8.0;
+  gl_PointSize = pointSize;
 
   // NOTES(mudit): shift sampled simplex4d weight from -1..1 to 0..1
   float wtuv = (vertexWeight+1.0)*0.5;

@@ -23,16 +23,23 @@
           fprintf(stderr, __VA_ARGS__),                                                                  \
           fprintf(stderr, "\n"),                                                                         \
           abort())
-#endif
+#endif // assertm
 
 #define DeferScope(startExpr, endExpr) \
   for(int DeferScope_i__ = (startExpr, 0); DeferScope_i__ == 0; (DeferScope_i__++, endExpr))
 
 #define WIDTH  1280
 #define HEIGHT 720
-#define GRID_W 3
 #define COLS   ((WIDTH/GRID_W)+1)
 #define ROWS   ((HEIGHT/GRID_W)+1)
+
+#ifndef GRID_W
+#define GRID_W    3    // used in debug build
+#endif // GRID_W
+
+#ifndef POINTSIZE
+#define POINTSIZE 8.0f // used in debug build
+#endif // POINTSIZE
 
 #define POINTSCOUNT   (COLS*ROWS)
 #define MAXLINESCOUNT ((ROWS-1)*(COLS-1)*2) // each square can contain at max 2 lines
@@ -52,8 +59,8 @@ static u8    states[POINTSCOUNT]  = {0};
 static f32 featureSize  = 0.003f;
 static f32 rateOfChange = 0.17f;
 static f32 isoVal       = -0.5f;
-static u32 LINESCOUNT   = 0;
-static const Point RES  = {WIDTH, HEIGHT};
+static u32 linesCount   = 0;
+static const Point res  = {WIDTH, HEIGHT};
 
 void updateState(f32 t, bool calcLines)
 {
@@ -74,7 +81,7 @@ void updateState(f32 t, bool calcLines)
     }
   }
 
-  LINESCOUNT = 0;
+  linesCount = 0;
 
   if (calcLines) {
     u32 lineIdx = 0;
@@ -193,7 +200,7 @@ void updateState(f32 t, bool calcLines)
     assertm(lineIdx < MAXLINESCOUNT,
             "Expected max generated lines count to be %d, Received: %d", MAXLINESCOUNT, lineIdx);
 
-    LINESCOUNT = lineIdx - 1;
+    linesCount = lineIdx - 1;
   }
 }
 
@@ -203,7 +210,7 @@ int main(void)
   snprintf(pointCountText, 64, "%d points", POINTSCOUNT);
 
   char linesCountText[64] = {0};
-  snprintf(linesCountText, 64, "%d lines", LINESCOUNT);
+  snprintf(linesCountText, 64, "%d lines", linesCount);
 
   f64 t             = 0;
   bool drawFps      = false;
@@ -226,7 +233,7 @@ int main(void)
   SetConfigFlags(FLAG_WINDOW_HIGHDPI);
   SetConfigFlags(FLAG_MSAA_4X_HINT);
 
-  DeferScope(InitWindow(WIDTH, HEIGHT, "Marching squares contouring Simplex3D noise rendered using GL_POINTS"), CloseWindow()) {
+  DeferScope(InitWindow(WIDTH, HEIGHT, "Marching squares contouring Simplex3D noise"), CloseWindow()) {
     SetTargetFPS(120);
 
     // USED VBOs SETUP
@@ -258,8 +265,8 @@ int main(void)
 
 
     // SHARED SHADER UNIFORM, ATTRIB LOCS and IDs
-    u32 raylibDefaultShaderId = rlGetShaderIdDefault();
     i32 resolutionUniformLoc = -1;
+    i32 pointSizeUniformLoc = -1;
     i32 vertexPositionAttribLoc = -1;
     i32 vertexWeightAttribLoc = -1;
 
@@ -271,11 +278,11 @@ int main(void)
     // non-existent file paths for example and even IsShaderValid()
     // returns 1 as raylib silently loads its default shader and returns
     // that as the value for LoadShader(...). Hence the check below
-    assertm(IsShaderValid(lineShader) && lineShader.id != raylibDefaultShaderId, "Invalid shader: line shader");
+    assertm(IsShaderValid(lineShader) && lineShader.id != rlGetShaderIdDefault(), "Invalid shader: line shader");
 
     resolutionUniformLoc = GetShaderLocation(lineShader, "resolution");
       assertm(resolutionUniformLoc != -1, "Could not find uniform `resolution` in line shader");
-      SetShaderValue(lineShader, resolutionUniformLoc, &RES, SHADER_UNIFORM_VEC2);
+      SetShaderValue(lineShader, resolutionUniformLoc, &res, SHADER_UNIFORM_VEC2);
     resolutionUniformLoc = -1;
 
     // LINES VAO SETUP
@@ -303,14 +310,20 @@ int main(void)
     // NOTES(mudit): Draws the sampled weights from simplex3d in the
     // grid given by points array
     Shader pointShader = LoadShader("point.vert", "point.frag");
-    assertm(IsShaderValid(pointShader) && pointShader.id != raylibDefaultShaderId, "Invalid shader: point shader");
+    assertm(IsShaderValid(pointShader) && pointShader.id != rlGetShaderIdDefault(), "Invalid shader: point shader");
 
     // NOTES(mudit): GetShaderLocation gets a uniform location by name
     // whereas to get an attribute location, use GetShaderLocationAttrib(...)
     resolutionUniformLoc = GetShaderLocation(pointShader, "resolution");
       assertm(resolutionUniformLoc != -1, "Point shader: Could not find uniform `resolution`");
-      SetShaderValue(pointShader, resolutionUniformLoc, &RES, SHADER_UNIFORM_VEC2);
+      SetShaderValue(pointShader, resolutionUniformLoc, &res, SHADER_UNIFORM_VEC2);
     resolutionUniformLoc = -1;
+
+    float pointSize = POINTSIZE;
+    pointSizeUniformLoc = GetShaderLocation(pointShader, "pointSize");
+      assertm(pointSizeUniformLoc != -1, "Point shader: Could not find uniform `pointSize`");
+      SetShaderValue(pointShader, pointSizeUniformLoc, &pointSize, SHADER_UNIFORM_FLOAT);
+    pointSizeUniformLoc = -1;
 
     // NOTES(mudit): Learnt from examples/others/raylib_opengl_interop.c
     // VAO -> basically holds the config for the VBOs that are enabled
@@ -479,17 +492,17 @@ int main(void)
 
         if (drawContours) {
           glBindBuffer(GL_ARRAY_BUFFER, linesVbo);
-          glBufferSubData(GL_ARRAY_BUFFER, 0, LINESCOUNT*sizeof(*lines), lines);
+          glBufferSubData(GL_ARRAY_BUFFER, 0, linesCount*sizeof(*lines), lines);
 
           DeferScope(glUseProgram(lineShader.id), glUseProgram(0)) {
             glBindVertexArray(linesVao);
-            glDrawArrays(GL_LINES, 0, LINESCOUNT);
+            glDrawArrays(GL_LINES, 0, linesCount);
             glBindVertexArray(0);
           }
         }
 
         if (drawFps) {
-          snprintf(linesCountText, 64, "%d lines", LINESCOUNT);
+          snprintf(linesCountText, 64, "%d lines", linesCount);
 
           DrawFPS(20, 20);
           DrawText(pointCountText, 20, 40, 20, LIME);

@@ -17,7 +17,7 @@ run2-dbg: main2-dbg
 	./$<
 
 main2: main2.c
-	$(CC) $(CFLAGS) -O2 $(INCLUDES) $(LIBS) $(FRAMEWORKS) $^ -o $@
+	$(CC) $(CFLAGS) -D"assertm(cond,...)=" -DGRID_W=2 -DPOINTSIZE=6.0f -O2 $(INCLUDES) $(LIBS) $(FRAMEWORKS) $^ -o $@
 
 main2-dbg: main2.c
 	$(CC) $(CFLAGS) -g $(INCLUDES) $(LIBS) $(FRAMEWORKS) $^ -o $@
