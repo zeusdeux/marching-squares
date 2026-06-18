@@ -1,20 +1,21 @@
-#version 330
+#version 330 core
 
-// Raylib's default and expected input vertex attributes
+// Raylib's default input attributes and uniform
+// Commented ones are unused in this project and
+// are for my own knowledge
+// in vec2 vertexTexCoord;
+// in vec3 vertexNormal;
+// in vec4 vertexColor;
+// uniform mat4 mvp;
+// uniform mat4 matModel;
+// uniform mat4 matNormal;
+
+// vertexPosition is one of the default attributes
+// in raylib and it's in use for passing in Points
 in vec2 vertexPosition;
-in vec2 vertexTexCoord;
-in vec3 vertexNormal;
-in vec4 vertexColor;
 
-// this is custom
+// These are custom
 in float vertexWeight;
-
-// Raylib's default and expected input uniform values
-uniform mat4 mvp;
-uniform mat4 matModel;
-uniform mat4 matNormal;
-
-// this is custom
 uniform vec2 resolution;
 
 // Output vertex attributes (to fragment shader)
