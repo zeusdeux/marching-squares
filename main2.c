@@ -446,10 +446,33 @@ int main(void)
             }
           }
 
+          bool keyP = IsKeyPressed(KEY_P) || IsKeyPressedRepeat(KEY_P);
+
+          if (!rightControl && keyP) {
+            pointSize += 1.f;
+
+            // max gl_PointSize on macos is 64.0
+            if (pointSize > 64.f) {
+              pointSize = 64.f;
+            }
+          }
+
+          if (rightControl && keyP) {
+            pointSize -= 1.f;
+
+            // min gl_PointSize on macos is 1.f but that
+            // just makes everything disappear so clamping
+            // at 2.0f
+            if (pointSize < 2.f) {
+              pointSize = 2.f;
+            }
+          }
+
           if (rightControl && IsKeyPressed(KEY_G)) {
             featureSize  = 0.003f;
             rateOfChange = 0.17f;
             isoVal       = -0.5f;
+            pointSize    = POINTSIZE;
           }
         }
 
@@ -484,6 +507,9 @@ int main(void)
           glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(weights), weights);
 
           DeferScope(glUseProgram(pointShader.id), glUseProgram(0)) {
+            pointSizeUniformLoc = GetShaderLocation(pointShader, "pointSize");
+            glUniform1f(pointSizeUniformLoc, pointSize);
+
             glBindVertexArray(pointsVao);
             glDrawArrays(GL_POINTS, 0, POINTSCOUNT);
             glBindVertexArray(0);
