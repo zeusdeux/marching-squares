@@ -321,9 +321,8 @@ int main(void)
 
     float pointSize = POINTSIZE;
     pointSizeUniformLoc = GetShaderLocation(pointShader, "pointSize");
-      assertm(pointSizeUniformLoc != -1, "Point shader: Could not find uniform `pointSize`");
-      SetShaderValue(pointShader, pointSizeUniformLoc, &pointSize, SHADER_UNIFORM_FLOAT);
-    pointSizeUniformLoc = -1;
+    assertm(pointSizeUniformLoc != -1, "Point shader: Could not find uniform `pointSize`");
+    SetShaderValue(pointShader, pointSizeUniformLoc, &pointSize, SHADER_UNIFORM_FLOAT);
 
     // NOTES(mudit): Learnt from examples/others/raylib_opengl_interop.c
     // VAO -> basically holds the config for the VBOs that are enabled
@@ -507,7 +506,6 @@ int main(void)
           glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(weights), weights);
 
           DeferScope(glUseProgram(pointShader.id), glUseProgram(0)) {
-            pointSizeUniformLoc = GetShaderLocation(pointShader, "pointSize");
             glUniform1f(pointSizeUniformLoc, pointSize);
 
             glBindVertexArray(pointsVao);
